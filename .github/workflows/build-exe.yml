@@ -1,0 +1,53 @@
+name: Build and Release EXE
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          if (Test-Path "requirements.txt") { pip install -r requirements.txt }
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --hidden-import "pynput.keyboard" --add-data "icons;icons" -n timer timer.py
+
+      - name: Upload build artifact (folder)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mho-skill-timer-folder
+          path: dist/timer/
+
+  release:
+    needs: build_windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download EXE artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mho-skill-timer
+          path: ./release
+
+      - name: Create Release and Upload EXE
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: "Automated release from GitHub Actions"
+          files: ./release/timer.exe
+          overwrite: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
